@@ -1,12 +1,10 @@
 #!/usr/bin/python3
 import os
-import launch, launch_ros
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.substitutions import LaunchConfiguration
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, TimerAction, DeclareLaunchArgument, LogInfo
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from ament_index_python.packages import get_package_prefix
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -23,7 +21,8 @@ def generate_launch_description():
   state_pub = IncludeLaunchDescription(
     PythonLaunchDescriptionSource(
       os.path.join(pkg_testbed_description, 'launch', 'robot_description.launch.py'),
-    )
+    ),
+    launch_arguments={'use_sim_time': 'true'}.items()
   )
 
   spawn = IncludeLaunchDescription(
@@ -33,22 +32,58 @@ def generate_launch_description():
   )
   
   rviz_config_dir = os.path.join(
-    launch_ros.substitutions.FindPackageShare(package='testbed_description').find('testbed_description'),
-    'rviz/full_bringup.rviz')
+    pkg_testbed_description,
+    'rviz',
+    'full_bringup.rviz')
   
   rviz_node = Node(
     package='rviz2',
     executable='rviz2',
     name='rviz_node',
-    parameters=[{'use_sim_time': True}],
+    parameters=[{
+        'use_sim_time': True,
+        'tf_buffer_size': 120,  # Increase TF buffer size
+        'tf_timeout': 10.0      # Increase TF timeout
+    }],
     arguments=['-d', LaunchConfiguration('rvizconfig')]
   )
 
+  # Static transform publisher for map to odom (temporary until localization is running)
+  # Note: This will be replaced by AMCL when localization starts
+  static_transform_node = Node(
+    package='tf2_ros',
+    executable='static_transform_publisher',
+    name='static_tf_pub_map_odom',
+    arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+    parameters=[{'use_sim_time': True}]
+  )
+
+  # Add sequential timing for better coordination
+  delayed_spawn = TimerAction(
+    period=3.0,  # Increased spawn delay to 3 seconds for better TF establishment
+    actions=[
+        LogInfo(msg="Spawning robot in Gazebo..."),
+        spawn
+    ]
+  )
+
+  # Add a delay for RViz to start after other components are ready
+  delayed_rviz = TimerAction(
+    period=7.0,  # Increased delay to 7 seconds to ensure sensor data and TF are synchronized
+    actions=[
+        LogInfo(msg="Starting RViz visualization..."),
+        rviz_node
+    ]
+  )
+
   return LaunchDescription([
-    launch.actions.DeclareLaunchArgument(name='rvizconfig', default_value=rviz_config_dir,
+    DeclareLaunchArgument(name='rvizconfig', default_value=rviz_config_dir,
                                             description='Absolute path to rviz config file'),
+    LogInfo(msg="Starting Testbed Full Bringup..."),
+    LogInfo(msg="Starting Robot Description and Gazebo World..."),
     state_pub,
     gazebo,
-    spawn,
-    rviz_node,
+    static_transform_node,  # Enabled temporarily for map visualization - will be replaced by AMCL
+    delayed_spawn,  # Use delayed spawn instead of immediate spawn
+    delayed_rviz,
   ])
