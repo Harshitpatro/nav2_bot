@@ -119,15 +119,6 @@ ros2 topic echo /navigate_to_pose/_action/status  # Navigation status
 ros2 param get /controller_server controller_frequency  # Check parameters
 ```
 
-## ⚠️ **Known Issues & Solutions**
-
-| Issue | Symptom | Solution |
-|-------|---------|----------|
-| Map not visible | RViz shows "No map received" | Ensure Map display uses "Transient Local" QoS |
-| No map frame | "map" not in Fixed Frame dropdown | Check static transform publisher is running |
-| Goals not working | Nav2 Goal tool unresponsive | Use "2D Nav Goal" tool instead |
-| Poor localization | Robot position drifts | Set initial pose with "2D Pose Estimate" |
-
 ## 📚 **Documentation**
 
 ### Detailed Guides
@@ -180,7 +171,6 @@ ros2 launch testbed_navigation test_navigation.launch.py
 ./scripts/check_navigation_system.sh
 ```
 
-## 📞 **Support**
 
 ### Troubleshooting
 1. **Check System Status**: Use provided diagnostic commands
